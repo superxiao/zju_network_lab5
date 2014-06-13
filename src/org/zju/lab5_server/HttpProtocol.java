@@ -53,7 +53,11 @@ public class HttpProtocol {
 					String url = "second_page.html";
 					String response;
 					response = new String(Files.readAllBytes(Paths.get(url)));
-					return "HTTP/1.1 200 OK\r\n\r\n" + response;
+					
+					RSA rsa=new RSA();
+					int signatureInt=rsa.encoded(123,7341,53*179);  //123：明文         7341:私钥      53*179：大素数乘积
+					String  signature= Integer.toString(signatureInt);
+					return "HTTP/1.1 200 OK\r\n\r\n" + response+"\r\nsignature="+signature+"\r\n";
 				}
 
 			} catch (IOException e) {
@@ -96,6 +100,20 @@ public class HttpProtocol {
 		
 		String response = "";
 		while ((line = reader.readLine()) != null) {
+			if(line.startsWith("signature="))
+			{
+				int signatureInt= Integer.parseInt(line.substring(10));
+				RSA rsa=new RSA();
+				signatureInt=rsa.encoded(signatureInt,29,53*179);
+				if(signatureInt==123)
+				{
+					break;
+				}
+				else
+				{
+					return null;
+				}
+			}
 			response = response + line + "\r\n";
 		} 
 
