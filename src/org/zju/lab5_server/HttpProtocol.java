@@ -3,6 +3,7 @@ package org.zju.lab5_server;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
@@ -10,9 +11,9 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.URLEncoder;
 import java.net.UnknownHostException;
+import java.nio.CharBuffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Scanner;
 
 public class HttpProtocol {
 
@@ -52,8 +53,17 @@ public class HttpProtocol {
 					// 返回页面2的信息
 					String url = "second_page.html";
 					String response;
-					response = new String(Files.readAllBytes(Paths.get(url)));
-					return "HTTP/1.1 200 OK\r\n\r\n" + response;
+					response = "HTTP/1.1 200 OK\r\n\r\n" + new String(Files.readAllBytes(Paths.get(url)));
+					DesEncryption encryption = new DesEncryption();
+					byte[] bytes = encryption.DES_Encrypt(encryption.ToBytes(response), "1234567890");
+					String responseEn = encryption.BytesToString(bytes);
+					bytes = encryption.ToBytes(responseEn);
+					System.out.println("encoded bytes are " + bytes.toString() + "\n");
+					bytes = encryption.DES_Decrypt(encryption.ToBytes(responseEn), "1234567890");
+					System.out.println("Encoded is:\n" + responseEn);
+					String decoded = encryption.BytesToString(bytes);
+					System.out.println("Decoded is:\n" + decoded);
+					return responseEn;
 				}
 
 			} catch (IOException e) {
@@ -90,18 +100,29 @@ public class HttpProtocol {
 		writer.flush();
 
 		// Get response
-		BufferedReader reader = new BufferedReader(
-				new InputStreamReader(socket.getInputStream()));
-		String line;
+		InputStream inStream = socket.getInputStream();
+		byte[] byteBuffer = new byte[10000];
+		int count = inStream.read(byteBuffer);
+		if(count <= 0)
+		{
+			System.out.println("Gets no response from the other server.");
+			return null;
+		}
 		
-		String response = "";
-		while ((line = reader.readLine()) != null) {
-			response = response + line + "\r\n";
-		} 
-
+		byte[] responseBytes = new byte[count];
+		System.arraycopy(byteBuffer, 0, responseBytes, 0, count);
+		
+		DesEncryption encryption = new DesEncryption();
+		
+		byte[] decryptedBytes = encryption.DES_Decrypt(responseBytes, "1234567890");
+		
+		String out = encryption.BytesToString(decryptedBytes);
+		
+		//System.out.println("DES decoded is:\n" + out + "\n");
+		
 		writer.close();
-		reader.close();
+		inStream.close();
 		socket.close();
-		return response + "\r\n";
+		return out + "\r\n";
 	}
 }
